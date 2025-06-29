@@ -72,8 +72,6 @@ A Windows service and Discord bot for managing Steam-based game servers. This so
    - After updating your config, restart the service or console app to apply changes.
 
 ## Discord Bot Commands
-- `!sm ping` - Check bot responsiveness
-- `!sm list` - List configured servers
 - `!sm status` - Show server status (running, RAM, CPU)
 - `!sm start <server>` - Start a server
 - `!sm stop <server>` - Stop a server

@@ -185,8 +185,6 @@ public static class Logger
 public class DiscordBotService
 {
     // Command name constants
-    private const string CommandPing = "ping";
-    private const string CommandList = "list";
     private const string CommandStatus = "status";
     private const string CommandStop = "stop";
     private const string CommandStart = "start";
@@ -260,24 +258,27 @@ public class DiscordBotService
             var parts = message.Content.Split(' ', 3, StringSplitOptions.RemoveEmptyEntries);
             var command = parts.Length > 1 ? parts[1].ToLowerInvariant() : string.Empty;
             string serverName = parts.Length > 2 ? parts[2] : string.Empty;
-            GameServerConfig? server = !string.IsNullOrWhiteSpace(serverName) ? FindServerByName(config, serverName) : null;
+            GameServerConfig? server = null;
+            if (!string.IsNullOrWhiteSpace(serverName) && config != null)
+            {
+                server = config.Servers.FirstOrDefault(s => s.Name.Equals(serverName, StringComparison.OrdinalIgnoreCase));
+            }
 
             // For commands that require a server, warn if not found
             bool requiresServer = command is CommandStop or CommandStart or CommandBackup or CommandUpdate;
-            if (requiresServer && !string.IsNullOrWhiteSpace(serverName) && server == null)
+            if (requiresServer && (!string.IsNullOrWhiteSpace(serverName) && server == null))
             {
                 await SendErrorAsync(message.Channel, $"No server found with name '{serverName}'.");
+                return;
+            }
+            if (config == null || bot == null)
+            {
+                await SendErrorAsync(message.Channel, "Configuration or bot service is not available.");
                 return;
             }
 
             switch (command)
             {
-                case CommandPing:
-                    await HandlePingCommand(message);
-                    break;
-                case CommandList:
-                    await HandleListCommand(message, config);
-                    break;
                 case CommandStatus:
                     await HandleStatusCommand(message, config);
                     break;
@@ -294,7 +295,7 @@ public class DiscordBotService
                     await HandleUpdateCommand(message, config, bot, server!);
                     break;
                 default:
-                    await message.Channel.SendMessageAsync($"Unknown command: {command}\nAvailable commands: {CommandPing}, {CommandList}, {CommandStatus}, {CommandStop}, {CommandStart}, {CommandBackup}, {CommandUpdate}");
+                    await message.Channel.SendMessageAsync($"Unknown command: {command}\nAvailable commands: {CommandStatus}, {CommandStop}, {CommandStart}, {CommandBackup}, {CommandUpdate}");
                     break;
             }
         }
@@ -302,23 +303,6 @@ public class DiscordBotService
         {
             Logger.Error($"Error handling message: '{message.Content}'", ex);
         }
-    }
-
-    private async Task HandlePingCommand(SocketMessage message)
-    {
-        await message.Channel.SendMessageAsync("Pong!");
-    }
-
-    private async Task HandleListCommand(SocketMessage message, SteamManagerConfiguration config)
-    {
-        var serverNames = config.Servers.Select(s => $"- {s.Name}");
-        await message.Channel.SendMessageAsync($"Configured servers:\n{string.Join("\n", serverNames)}");
-    }
-
-    private GameServerConfig? FindServerByName(SteamManagerConfiguration? config, string name)
-    {
-        if (config == null || string.IsNullOrWhiteSpace(name)) return null;
-        return config.Servers.FirstOrDefault(s => s.Name.Equals(name, StringComparison.OrdinalIgnoreCase));
     }
 
     private async Task HandleStatusCommand(SocketMessage message, SteamManagerConfiguration config)
