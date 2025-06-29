@@ -5,7 +5,6 @@ namespace GameServerManagerService;
 
 public class DiscordBotService
 {
-    // Command name constants
     private const string CommandStatus = "status";
     private const string CommandStop = "stop";
     private const string CommandStart = "start";
@@ -87,7 +86,7 @@ public class DiscordBotService
 
             // For commands that require a server, warn if not found
             bool requiresServer = command is CommandStop or CommandStart or CommandBackup or CommandUpdate;
-            if (requiresServer && (!string.IsNullOrWhiteSpace(serverName) && server == null))
+            if (requiresServer && !string.IsNullOrWhiteSpace(serverName) && server == null)
             {
                 await SendErrorAsync(message.Channel, $"No server found with name '{serverName}'.");
                 return;
@@ -131,9 +130,9 @@ public class DiscordBotService
         // Sample CPU usage for each process over 500ms
         var serverInfos = config.Servers.Select(s =>
         {
-            var exeName = System.IO.Path.GetFileNameWithoutExtension(s.ExecutableName);
+            var exeName = Path.GetFileNameWithoutExtension(s.ExecutableName);
             var processes = System.Diagnostics.Process.GetProcessesByName(exeName);
-            var isRunning = processes.Any();
+            var isRunning = processes.Length != 0;
             long totalRam = 0;
             var cpuTimes = new List<(int pid, TimeSpan startTime)>();
             foreach (var proc in processes)
@@ -173,7 +172,7 @@ public class DiscordBotService
         await message.Channel.SendMessageAsync($"Server status:\n{string.Join("\n", statusList)}");
     }
 
-    private string FormatBytes(long bytes)
+    private static string FormatBytes(long bytes)
     {
         if (bytes > 1024 * 1024 * 1024)
             return $"{bytes / (1024.0 * 1024 * 1024):F2} GB";
@@ -184,7 +183,7 @@ public class DiscordBotService
         return $"{bytes} B";
     }
 
-    private async Task SendErrorAsync(ISocketMessageChannel channel, string userMessage, Exception? ex = null)
+    private static async Task SendErrorAsync(ISocketMessageChannel channel, string userMessage, Exception? ex = null)
     {
         await channel.SendMessageAsync($":x: {userMessage}");
         if (ex != null)
@@ -193,30 +192,30 @@ public class DiscordBotService
             Logger.Log($"Error: {userMessage}");
     }
 
-    private async Task HandleStopCommand(SocketMessage message, GameServerManagerConfiguration config, DiscordBotService bot, GameServerConfig server)
+    private static async Task HandleStopCommand(SocketMessage message, GameServerManagerConfiguration config, DiscordBotService bot, GameServerConfig server)
     {
-        await bot.StopServer(server, message.Channel);
+        await StopServer(server, message.Channel);
     }
 
-    private async Task HandleStartCommand(SocketMessage message, GameServerManagerConfiguration config, DiscordBotService bot, GameServerConfig server)
+    private static async Task HandleStartCommand(SocketMessage message, GameServerManagerConfiguration config, DiscordBotService bot, GameServerConfig server)
     {
-        await bot.StartServer(server, message.Channel);
+        await StartServer(server, message.Channel);
     }
 
-    private async Task HandleBackupCommand(SocketMessage message, GameServerManagerConfiguration config, DiscordBotService bot, GameServerConfig server)
+    private static async Task HandleBackupCommand(SocketMessage message, GameServerManagerConfiguration config, DiscordBotService bot, GameServerConfig server)
     {
-        var wasRunning = await bot.StopServer(server, message.Channel);
-        bool backupSuccess = await bot.BackupServer(server, config.BackupLocation, message.Channel);
+        var wasRunning = await StopServer(server, message.Channel);
+        bool backupSuccess = await BackupServer(server, config.BackupLocation, message.Channel);
         if (wasRunning && backupSuccess)
         {
-            await bot.StartServer(server, message.Channel);
+            await StartServer(server, message.Channel);
         }
     }
 
-    private async Task HandleUpdateCommand(SocketMessage message, GameServerManagerConfiguration config, DiscordBotService bot, GameServerConfig server)
+    private static async Task HandleUpdateCommand(SocketMessage message, GameServerManagerConfiguration config, DiscordBotService bot, GameServerConfig server)
     {
-        var wasRunning = await bot.StopServer(server, message.Channel);
-        bool backupSuccess = await bot.BackupServer(server, config.BackupLocation, message.Channel, "before update");
+        var wasRunning = await StopServer(server, message.Channel);
+        bool backupSuccess = await BackupServer(server, config.BackupLocation, message.Channel, "before update");
         if (!backupSuccess)
         {
             await SendErrorAsync(message.Channel, $"Backup failed. Update aborted for '{server.Name}'.");
@@ -273,14 +272,14 @@ public class DiscordBotService
         }
         if (wasRunning)
         {
-            await bot.StartServer(server, message.Channel);
+            await StartServer(server, message.Channel);
         }
     }
 
-    private async Task<bool> StopServer(GameServerConfig server, ISocketMessageChannel channel)
+    private static async Task<bool> StopServer(GameServerConfig server, ISocketMessageChannel channel)
     {
         if (string.IsNullOrWhiteSpace(server.ExecutableName)) return false;
-        var exeNameNoExt = System.IO.Path.GetFileNameWithoutExtension(server.ExecutableName);
+        var exeNameNoExt = Path.GetFileNameWithoutExtension(server.ExecutableName);
         var processes = System.Diagnostics.Process.GetProcessesByName(exeNameNoExt);
         if (processes.Length == 0) return false; // Not running
         await channel.SendMessageAsync($"Stopping '{server.Name}' before backup...");
@@ -298,7 +297,7 @@ public class DiscordBotService
         return true;
     }
 
-    private async Task StartServer(GameServerConfig server, ISocketMessageChannel channel)
+    private static async Task StartServer(GameServerConfig server, ISocketMessageChannel channel)
     {
         if (string.IsNullOrWhiteSpace(server.StartCommand))
         {
@@ -325,7 +324,7 @@ public class DiscordBotService
         }
     }
 
-    private async Task<bool> BackupServer(GameServerConfig server, string backupLocation, ISocketMessageChannel channel, string? context = null)
+    private static async Task<bool> BackupServer(GameServerConfig server, string backupLocation, ISocketMessageChannel channel, string? context = null)
     {
         try
         {

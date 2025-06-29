@@ -4,7 +4,7 @@ namespace GameServerManagerService;
 
 public class GameServerManagerConfiguration
 {
-    public List<GameServerConfig> Servers { get; set; } = new();
+    public List<GameServerConfig> Servers { get; set; } = [];
     public string BackupLocation { get; set; } = string.Empty;
     public string DiscordBotToken { get; set; } = string.Empty;
 
@@ -24,12 +24,12 @@ public class GameServerManagerConfiguration
 
     public bool Validate(out List<string> errors)
     {
-        errors = new List<string>();
+        errors = [];
         if (Servers == null || Servers.Count == 0)
             errors.Add("No servers are configured.");
         if (string.IsNullOrWhiteSpace(BackupLocation))
             errors.Add("BackupLocation is not set.");
-        else if (!System.IO.Directory.Exists(BackupLocation))
+        else if (!Directory.Exists(BackupLocation))
             errors.Add($"BackupLocation '{BackupLocation}' does not exist.");
         if (string.IsNullOrWhiteSpace(DiscordBotToken))
             errors.Add("DiscordBotToken is not set.");
@@ -46,7 +46,7 @@ public class GameServerManagerConfiguration
                     errors.Add($"Server '{server.Name}' is missing InstallLocation.");
                 if (string.IsNullOrWhiteSpace(server.SaveDirectory))
                     errors.Add($"Server '{server.Name}' is missing SaveDirectory.");
-                else if (!System.IO.Directory.Exists(server.SaveDirectory))
+                else if (!Directory.Exists(server.SaveDirectory))
                     errors.Add($"SaveDirectory '{server.SaveDirectory}' for server '{server.Name}' does not exist.");
                 if (string.IsNullOrWhiteSpace(server.ExecutableName))
                     errors.Add($"Server '{server.Name}' is missing ExecutableName.");

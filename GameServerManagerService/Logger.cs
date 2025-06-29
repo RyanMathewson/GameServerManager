@@ -1,5 +1,3 @@
-using System;
-
 namespace GameServerManagerService;
 
 public static class Logger
@@ -14,8 +12,10 @@ public static class Logger
         lock (_lock)
         {
             if (!Directory.Exists(LogDirectory))
+            {
                 Directory.CreateDirectory(LogDirectory);
-            System.IO.File.AppendAllText(LogFilePath, formatted + "\n");
+            }
+            File.AppendAllText(LogFilePath, formatted + "\n");
         }
         Console.WriteLine(formatted);
     }

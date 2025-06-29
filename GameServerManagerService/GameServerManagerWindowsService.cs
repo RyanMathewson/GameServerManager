@@ -14,7 +14,6 @@ public class GameServerManagerWindowsService : ServiceBase
         ServiceName = "Game Server Manager";
     }
 
-    // This method is called when the service is started
     protected override void OnStart(string[] args)
     {
         try
@@ -45,7 +44,6 @@ public class GameServerManagerWindowsService : ServiceBase
         }
     }
 
-    // This method is called when the service is stopped
     protected override void OnStop()
     {
         Bot?.Stop();
