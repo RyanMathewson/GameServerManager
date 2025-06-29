@@ -1,0 +1,14 @@
+{
+  "servers": [
+    {
+      "name": "example-server",
+      "installLocation": "C:/Path/To/Server",
+      "saveDirectory": "C:/Path/To/Saves",
+      "startCommand": "C:/Path/To/StartScript.bat",
+      "updateCommand": "C:/Path/To/UpdateScript.bat",
+      "executableName": "ServerExecutable.exe"
+    }
+  ],
+  "backupLocation": "C:/Path/To/Backups",
+  "discordBotToken": "YOUR_DISCORD_BOT_TOKEN_HERE"
+}

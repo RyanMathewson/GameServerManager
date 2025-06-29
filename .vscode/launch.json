@@ -1,0 +1,18 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "GameServerManagerService Console Debug",
+      "type": "coreclr",
+      "request": "launch",
+      "preLaunchTask": "build",
+      "program": "${workspaceFolder}/GameServerManagerService/bin/Debug/net8.0-windows/GameServerManagerService.exe",
+      "args": [
+        "--console"
+      ],
+      "cwd": "${workspaceFolder}/GameServerManagerService",
+      "stopAtEntry": false,
+      "console": "internalConsole"
+    }
+  ]
+}
