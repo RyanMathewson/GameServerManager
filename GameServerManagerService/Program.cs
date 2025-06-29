@@ -2,17 +2,18 @@
 using System.Text.Json;
 using Discord;
 using Discord.WebSocket;
-using System.Threading.Tasks;
-using System.Threading;
 
-// Define the Windows Service class
+namespace GameServerManagerService;
+
 public class SteamManagerService : ServiceBase
 {
-    private SteamManagerConfiguration? _config;
-    private DiscordBotService? _discordBot;
+    public static SteamManagerService Instance { get; private set; } = null!;
+    public SteamManagerConfiguration? Config { get; private set; }
+    public DiscordBotService? Bot { get; private set; }
+
     public SteamManagerService()
     {
-        ServiceBaseHolder.Instance = this;
+        Instance = this;
         ServiceName = "Steam Game Server Manager";
     }
 
@@ -22,18 +23,18 @@ public class SteamManagerService : ServiceBase
         try
         {
             var configPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "config.json");
-            _config = SteamManagerConfiguration.Load(configPath);
-            if (!_config.Validate(out var errors))
+            Config = SteamManagerConfiguration.Load(configPath);
+            if (!Config.Validate(out var errors))
             {
                 foreach (var err in errors)
                     Logger.Log($"Config validation error: {err}");
                 throw new InvalidOperationException("Configuration validation failed. See log for details.");
             }
-            Logger.Log($"Service started. Loaded {_config.Servers.Count} servers.");
-            if (!string.IsNullOrWhiteSpace(_config.DiscordBotToken))
+            Logger.Log($"Service started. Loaded {Config.Servers.Count} servers.");
+            if (!string.IsNullOrWhiteSpace(Config.DiscordBotToken))
             {
-                _discordBot = new DiscordBotService(_config.DiscordBotToken);
-                _discordBot.Start();
+                Bot = new DiscordBotService(Config.DiscordBotToken);
+                Bot.Start();
             }
             else
             {
@@ -50,7 +51,7 @@ public class SteamManagerService : ServiceBase
     // This method is called when the service is stopped
     protected override void OnStop()
     {
-        _discordBot?.Stop();
+        Bot?.Stop();
         Logger.Log("Service stopped.");
     }
 
@@ -58,7 +59,7 @@ public class SteamManagerService : ServiceBase
     {
         try
         {
-            OnStart(Array.Empty<string>());
+            OnStart([]);
             Console.WriteLine("Service running as console app. Press Enter to exit...");
             Console.ReadLine();
             OnStop();
@@ -68,9 +69,6 @@ public class SteamManagerService : ServiceBase
             Logger.Error("Console mode error", ex);
         }
     }
-
-    public SteamManagerConfiguration? Config => _config;
-    public DiscordBotService? Bot => _discordBot;
 }
 
 // Define the program entry point
@@ -249,8 +247,8 @@ public class DiscordBotService
         {
             Logger.Log($"Received message: Author={message.Author.Username}, Content='{message.Content}', Channel={message.Channel.Name}");
             if (message.Author.IsBot) return;
-            var config = ((SteamManagerService)ServiceBaseHolder.Instance).Config!;
-            var bot = ((SteamManagerService)ServiceBaseHolder.Instance).Bot!;
+            var config = SteamManagerService.Instance.Config!;
+            var bot = SteamManagerService.Instance.Bot!;
             if (!message.Content.StartsWith("!sm", StringComparison.OrdinalIgnoreCase))
             {
                 return;
@@ -522,9 +520,4 @@ public class DiscordBotService
             return false;
         }
     }
-}
-
-public static class ServiceBaseHolder
-{
-    public static ServiceBase Instance { get; set; } = null!;
 }
