@@ -1,5 +1,4 @@
 ﻿using System.ServiceProcess;
-using System.Text.Json;
 using Discord;
 using Discord.WebSocket;
 
@@ -8,7 +7,7 @@ namespace GameServerManagerService;
 public class SteamManagerService : ServiceBase
 {
     public static SteamManagerService Instance { get; private set; } = null!;
-    public SteamManagerConfiguration? Config { get; private set; }
+    public GameServerManagerConfiguration? Config { get; private set; }
     public DiscordBotService? Bot { get; private set; }
 
     public SteamManagerService()
@@ -23,7 +22,7 @@ public class SteamManagerService : ServiceBase
         try
         {
             var configPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "config.json");
-            Config = SteamManagerConfiguration.Load(configPath);
+            Config = GameServerManagerConfiguration.Load(configPath);
             if (!Config.Validate(out var errors))
             {
                 foreach (var err in errors)
@@ -85,98 +84,6 @@ internal static class Program
         {
             ServiceBase.Run(new SteamManagerService());
         }
-    }
-}
-
-public class GameServerConfig
-{
-    public string Name { get; set; } = string.Empty;
-    public string InstallLocation { get; set; } = string.Empty;
-    public string SaveDirectory { get; set; } = string.Empty;
-    public string StartCommand { get; set; } = string.Empty;
-    public string UpdateCommand { get; set; } = string.Empty;
-    public string ExecutableName { get; set; } = string.Empty;
-}
-
-public class SteamManagerConfiguration
-{
-    public List<GameServerConfig> Servers { get; set; } = new();
-    public string BackupLocation { get; set; } = string.Empty;
-    public string DiscordBotToken { get; set; } = string.Empty;
-
-    public static SteamManagerConfiguration Load(string path)
-    {
-        Logger.Log($"Attempting to load config from: {Path.GetFullPath(path)}");
-        if (!File.Exists(path))
-        {
-            throw new FileNotFoundException($"Configuration file not found: {path}");
-        }
-        var json = File.ReadAllText(path);
-        var options = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
-        var config = JsonSerializer.Deserialize<SteamManagerConfiguration>(json, options) ?? new SteamManagerConfiguration();
-        Logger.Log($"Config loaded. Servers: {config.Servers.Count}");
-        return config;
-    }
-
-    public bool Validate(out List<string> errors)
-    {
-        errors = new List<string>();
-        if (Servers == null || Servers.Count == 0)
-            errors.Add("No servers are configured.");
-        if (string.IsNullOrWhiteSpace(BackupLocation))
-            errors.Add("BackupLocation is not set.");
-        else if (!System.IO.Directory.Exists(BackupLocation))
-            errors.Add($"BackupLocation '{BackupLocation}' does not exist.");
-        if (string.IsNullOrWhiteSpace(DiscordBotToken))
-            errors.Add("DiscordBotToken is not set.");
-        if (Servers != null)
-        {
-            var nameSet = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-            foreach (var server in Servers)
-            {
-                if (string.IsNullOrWhiteSpace(server.Name))
-                    errors.Add("A server is missing a Name.");
-                else if (!nameSet.Add(server.Name))
-                    errors.Add($"Duplicate server name found: '{server.Name}'");
-                if (string.IsNullOrWhiteSpace(server.InstallLocation))
-                    errors.Add($"Server '{server.Name}' is missing InstallLocation.");
-                if (string.IsNullOrWhiteSpace(server.SaveDirectory))
-                    errors.Add($"Server '{server.Name}' is missing SaveDirectory.");
-                else if (!System.IO.Directory.Exists(server.SaveDirectory))
-                    errors.Add($"SaveDirectory '{server.SaveDirectory}' for server '{server.Name}' does not exist.");
-                if (string.IsNullOrWhiteSpace(server.ExecutableName))
-                    errors.Add($"Server '{server.Name}' is missing ExecutableName.");
-                if (string.IsNullOrWhiteSpace(server.StartCommand))
-                    errors.Add($"Server '{server.Name}' is missing StartCommand.");
-                if (string.IsNullOrWhiteSpace(server.UpdateCommand))
-                    errors.Add($"Server '{server.Name}' is missing UpdateCommand.");
-            }
-        }
-        return errors.Count == 0;
-    }
-}
-
-public static class Logger
-{
-    private static readonly object _lock = new();
-    private static readonly string LogDirectory = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "logging");
-    private static readonly string LogFilePath = Path.Combine(LogDirectory, "SteamManagerService.log");
-
-    public static void Log(string message)
-    {
-        string formatted = $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] {message}";
-        lock (_lock)
-        {
-            if (!Directory.Exists(LogDirectory))
-                Directory.CreateDirectory(LogDirectory);
-            System.IO.File.AppendAllText(LogFilePath, formatted + "\n");
-        }
-        Console.WriteLine(formatted);
-    }
-
-    public static void Error(string message, Exception ex)
-    {
-        Log($"{message}\n{ex}");
     }
 }
 
@@ -303,7 +210,7 @@ public class DiscordBotService
         }
     }
 
-    private async Task HandleStatusCommand(SocketMessage message, SteamManagerConfiguration config)
+    private async Task HandleStatusCommand(SocketMessage message, GameServerManagerConfiguration config)
     {
         // Sample CPU usage for each process over 500ms
         var serverInfos = config.Servers.Select(s =>
@@ -370,17 +277,17 @@ public class DiscordBotService
             Logger.Log($"Error: {userMessage}");
     }
 
-    private async Task HandleStopCommand(SocketMessage message, SteamManagerConfiguration config, DiscordBotService bot, GameServerConfig server)
+    private async Task HandleStopCommand(SocketMessage message, GameServerManagerConfiguration config, DiscordBotService bot, GameServerConfig server)
     {
         await bot.StopServer(server, message.Channel);
     }
 
-    private async Task HandleStartCommand(SocketMessage message, SteamManagerConfiguration config, DiscordBotService bot, GameServerConfig server)
+    private async Task HandleStartCommand(SocketMessage message, GameServerManagerConfiguration config, DiscordBotService bot, GameServerConfig server)
     {
         await bot.StartServer(server, message.Channel);
     }
 
-    private async Task HandleBackupCommand(SocketMessage message, SteamManagerConfiguration config, DiscordBotService bot, GameServerConfig server)
+    private async Task HandleBackupCommand(SocketMessage message, GameServerManagerConfiguration config, DiscordBotService bot, GameServerConfig server)
     {
         var wasRunning = await bot.StopServer(server, message.Channel);
         bool backupSuccess = await bot.BackupServer(server, config.BackupLocation, message.Channel);
@@ -390,7 +297,7 @@ public class DiscordBotService
         }
     }
 
-    private async Task HandleUpdateCommand(SocketMessage message, SteamManagerConfiguration config, DiscordBotService bot, GameServerConfig server)
+    private async Task HandleUpdateCommand(SocketMessage message, GameServerManagerConfiguration config, DiscordBotService bot, GameServerConfig server)
     {
         var wasRunning = await bot.StopServer(server, message.Channel);
         bool backupSuccess = await bot.BackupServer(server, config.BackupLocation, message.Channel, "before update");
