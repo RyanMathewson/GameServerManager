@@ -419,3 +419,6 @@ FodyWeavers.xsd
 *.msix
 *.msm
 *.msp
+
+# Local MSBuild user props (do not commit local publish settings)
+Directory.Build.user.props

@@ -8,10 +8,6 @@
     <UseWindowsService>true</UseWindowsService>
   </PropertyGroup>
 
-  <PropertyGroup>
-    <PublishDir>X:\ServerManager\</PublishDir>
-  </PropertyGroup>
-
   <ItemGroup>
     <None Update="config.json">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
