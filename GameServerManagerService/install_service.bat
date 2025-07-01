@@ -1,6 +1,6 @@
 @echo off
-REM Install the GameServerManagerService as a Windows service
-set SERVICE_NAME=GameServerManagerService
+REM Install the Game Server Manager as a Windows service
+set SERVICE_NAME="Game Server Manager"
 set EXE_PATH=%~dp0GameServerManagerService.exe
 
 sc stop %SERVICE_NAME%

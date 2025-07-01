@@ -1,6 +1,6 @@
 @echo off
-REM Uninstall the GameServerManagerService Windows service
-set SERVICE_NAME=GameServerManagerService
+REM Uninstall the Game Server Manager Windows service
+set SERVICE_NAME="Game Server Manager"
 
 sc stop %SERVICE_NAME%
 sc delete %SERVICE_NAME%
