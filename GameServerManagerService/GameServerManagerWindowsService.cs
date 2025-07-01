@@ -27,6 +27,32 @@ public class GameServerManagerWindowsService : ServiceBase
                 throw new InvalidOperationException("Configuration validation failed. See log for details.");
             }
             Logger.Log($"Service started. Loaded {Config.Servers.Count} servers.");
+            // Auto-restart servers if enabled
+            if (Config.AutoRestartServersOnBoot)
+            {
+                var savePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "last_running_servers.json");
+                if (File.Exists(savePath))
+                {
+                    var names = System.Text.Json.JsonSerializer.Deserialize<List<string>>(File.ReadAllText(savePath)) ?? [];
+                    File.Delete(savePath);
+                    foreach (var name in names)
+                    {
+                        var server = Config.Servers.FirstOrDefault(s => s.Name == name);
+                        if (server != null)
+                        {
+                            if (Utility.StartServerProcess(server, out Exception? error))
+                            {
+                                Logger.Log($"Auto-restarted server: {server.Name}");
+                            }
+                            else
+                            {
+                                Logger.Error($"Failed to auto-restart server '{server.Name}': {error?.Message}", error!);
+                            }
+                        }
+                    }
+                    
+                }
+            }
             if (!string.IsNullOrWhiteSpace(Config.DiscordBotToken))
             {
                 Bot = new DiscordBotService(Config.DiscordBotToken);
@@ -46,6 +72,16 @@ public class GameServerManagerWindowsService : ServiceBase
 
     protected override void OnStop()
     {
+        // Save running servers if auto-restart is enabled
+        if (Config?.AutoRestartServersOnBoot == true && Config.Servers != null)
+        {
+            var runningServers = Config.Servers
+                .Where(s => System.Diagnostics.Process.GetProcessesByName(Path.GetFileNameWithoutExtension(s.ExecutableName)).Length > 0)
+                .Select(s => s.Name)
+                .ToList();
+            var savePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "last_running_servers.json");
+            File.WriteAllText(savePath, System.Text.Json.JsonSerializer.Serialize(runningServers));
+        }
         Bot?.Stop();
         Logger.Log("Service stopped.");
     }

@@ -7,6 +7,7 @@ public class GameServerManagerConfiguration
     public List<GameServerConfig> Servers { get; set; } = [];
     public string BackupLocation { get; set; } = string.Empty;
     public string DiscordBotToken { get; set; } = string.Empty;
+    public bool AutoRestartServersOnBoot { get; set; } = false;
 
     public static GameServerManagerConfiguration Load(string path)
     {

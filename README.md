@@ -5,6 +5,7 @@ A Windows service and Discord bot for managing Steam-based game servers. This so
 ## Features
 - Manage multiple Steam game servers
 - Start, stop, backup, and update servers via Discord commands
+- Automatically restart previously running servers after reboot/shutdown (configurable with `autoRestartServersOnBoot`)
 - Windows service mode and console mode
 - Configuration validation and logging
 
@@ -78,9 +79,6 @@ A Windows service and Discord bot for managing Steam-based game servers. This so
 - `!sm backup <server>` - Backup a server
 - `!sm update <server>` - Update a server (with pre-update backup)
 
-## Security
-- **Never commit your `config.json`!** It is excluded by `.gitignore`.
-- Store your Discord bot token and sensitive paths only in `config.json`.
 
 ## License
 MIT License

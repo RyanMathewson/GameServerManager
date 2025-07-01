@@ -193,7 +193,12 @@ public class DiscordBotService
 
     private static async Task HandleStartCommand(SocketMessage message, GameServerManagerConfiguration config, DiscordBotService bot, GameServerConfig server)
     {
-        await StartServer(server, message.Channel);
+        if (!Utility.StartServerProcess(server, out Exception? error))
+        {
+            await message.Channel.SendMessageAsync($"Failed to start '{server.Name}': {error?.Message}");
+            return;
+        }
+        await message.Channel.SendMessageAsync($"Start command executed for '{server.Name}'.");
     }
 
     private static async Task HandleBackupCommand(SocketMessage message, GameServerManagerConfiguration config, DiscordBotService bot, GameServerConfig server)
@@ -293,29 +298,12 @@ public class DiscordBotService
 
     private static async Task StartServer(GameServerConfig server, ISocketMessageChannel channel)
     {
-        if (string.IsNullOrWhiteSpace(server.StartCommand))
+        if (!Utility.StartServerProcess(server, out Exception? error))
         {
-            await channel.SendMessageAsync($"Start command not configured for server '{server.Name}'.");
+            await channel.SendMessageAsync($"Failed to start '{server.Name}': {error?.Message}");
             return;
         }
-        try
-        {
-            await channel.SendMessageAsync($"Starting '{server.Name}'");
-            var startInfo = new System.Diagnostics.ProcessStartInfo
-            {
-                FileName = "cmd.exe",
-                Arguments = $"/C {server.StartCommand}",
-                WorkingDirectory = string.IsNullOrWhiteSpace(server.InstallLocation) ? null : server.InstallLocation,
-                CreateNoWindow = true,
-                UseShellExecute = false
-            };
-            System.Diagnostics.Process.Start(startInfo);
-            await channel.SendMessageAsync($"Start command executed for '{server.Name}'.");
-        }
-        catch (Exception ex)
-        {
-            await SendErrorAsync(channel, $"Failed to start '{server.Name}'", ex);
-        }
+        await channel.SendMessageAsync($"Start command executed for '{server.Name}'.");
     }
 
     private static async Task<bool> BackupServer(GameServerConfig server, string backupLocation, ISocketMessageChannel channel, string? context = null)

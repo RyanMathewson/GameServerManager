@@ -10,5 +10,6 @@
     }
   ],
   "backupLocation": "C:/Path/To/Backups",
-  "discordBotToken": "YOUR_DISCORD_BOT_TOKEN_HERE"
+  "discordBotToken": "YOUR_DISCORD_BOT_TOKEN_HERE",
+  "autoRestartServersOnBoot": false
 }
