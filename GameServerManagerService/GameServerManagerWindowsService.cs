@@ -20,6 +20,7 @@ public class GameServerManagerWindowsService : ServiceBase
     {
         lock (_startedServers)
         {
+            Logger.Log($"Marking server '{name}' as started.");
             _startedServers.Add(name);
             SaveStartedServers();
         }
@@ -29,6 +30,7 @@ public class GameServerManagerWindowsService : ServiceBase
     {
         lock (_startedServers)
         {
+            Logger.Log($"Marking server '{name}' as stopped.");
             _startedServers.Remove(name);
             SaveStartedServers();
         }
@@ -37,12 +39,14 @@ public class GameServerManagerWindowsService : ServiceBase
     private void SaveStartedServers()
     {
         var savePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "last_running_servers.json");
+        Logger.Log($"Saving started servers '{string.Join(", ", _startedServers)}' to disk at '{savePath}'.");
         File.WriteAllText(savePath, System.Text.Json.JsonSerializer.Serialize(_startedServers.ToList()));
     }
 
     private void LoadStartedServers()
     {
         var savePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "last_running_servers.json");
+        Logger.Log($"Loading started servers from disk at '{savePath}'.");
         if (File.Exists(savePath))
         {
             var names = System.Text.Json.JsonSerializer.Deserialize<List<string>>(File.ReadAllText(savePath)) ?? [];
@@ -66,17 +70,6 @@ public class GameServerManagerWindowsService : ServiceBase
             }
             Logger.Log($"Service started. Loaded {Config.Servers.Count} servers.");
 
-            // Scan for currently running servers and mark them as started
-            foreach (var server in Config.Servers)
-            {
-                var exeName = Path.GetFileNameWithoutExtension(server.ExecutableName);
-                var processes = System.Diagnostics.Process.GetProcessesByName(exeName);
-                if (processes.Length > 0)
-                {
-                    MarkServerStarted(server.Name);
-                }
-            }
-
             if (Config.AutoRestartServersOnBoot)
             {
                 LoadStartedServers();
@@ -96,6 +89,18 @@ public class GameServerManagerWindowsService : ServiceBase
                     }
                 }
             }
+
+            // Scan for currently running servers and mark them as started
+            foreach (var server in Config.Servers)
+            {
+                var exeName = Path.GetFileNameWithoutExtension(server.ExecutableName);
+                var processes = System.Diagnostics.Process.GetProcessesByName(exeName);
+                if (processes.Length > 0)
+                {
+                    MarkServerStarted(server.Name);
+                }
+            }
+
             if (!string.IsNullOrWhiteSpace(Config.DiscordBotToken))
             {
                 Bot = new DiscordBotService(Config.DiscordBotToken);
