@@ -52,7 +52,6 @@ public class GameServerManagerWindowsService : ServiceBase
             var names = System.Text.Json.JsonSerializer.Deserialize<List<string>>(File.ReadAllText(savePath)) ?? [];
             _startedServers.Clear();
             foreach (var n in names) _startedServers.Add(n);
-            File.Delete(savePath);
         }
     }
 
