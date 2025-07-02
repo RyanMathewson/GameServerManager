@@ -67,7 +67,6 @@ public class DiscordBotService
     {
         try
         {
-            Logger.Log($"Received message: Author={message.Author.Username}, Content='{message.Content}', Channel={message.Channel.Name}");
             if (message.Author.IsBot) return;
             var config = GameServerManagerWindowsService.Instance.Config!;
             var bot = GameServerManagerWindowsService.Instance.Bot!;

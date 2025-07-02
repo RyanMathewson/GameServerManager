@@ -39,14 +39,12 @@ public class GameServerManagerWindowsService : ServiceBase
     private void SaveStartedServers()
     {
         var savePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "last_running_servers.json");
-        Logger.Log($"Saving started servers '{string.Join(", ", _startedServers)}' to disk at '{savePath}'.");
         File.WriteAllText(savePath, System.Text.Json.JsonSerializer.Serialize(_startedServers.ToList()));
     }
 
     private void LoadStartedServers()
     {
         var savePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "last_running_servers.json");
-        Logger.Log($"Loading started servers from disk at '{savePath}'.");
         if (File.Exists(savePath))
         {
             var names = System.Text.Json.JsonSerializer.Deserialize<List<string>>(File.ReadAllText(savePath)) ?? [];
