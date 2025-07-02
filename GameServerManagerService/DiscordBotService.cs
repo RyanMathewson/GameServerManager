@@ -310,6 +310,7 @@ public class DiscordBotService
                 throw; // Interrupt the operation
             }
         }
+        GameServerManagerWindowsService.Instance.MarkServerStopped(server.Name);
         await channel.SendMessageAsync($"Stopped {stopped} process(es) for '{server.Name}'.");
         return true;
     }
@@ -321,6 +322,7 @@ public class DiscordBotService
             await channel.SendMessageAsync($"Failed to start '{server.Name}': {error?.Message}");
             return;
         }
+        GameServerManagerWindowsService.Instance.MarkServerStarted(server.Name);
         await channel.SendMessageAsync($"Start command executed for '{server.Name}'.");
     }
 
