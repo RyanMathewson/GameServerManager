@@ -3,19 +3,9 @@
 A Windows service and Discord bot for managing Steam-based game servers. This solution provides automated server management, backup, and update features, with Discord integration for remote control and status monitoring.
 
 ## Features
-- Manage multiple Steam game servers
+- Manage multiple game servers
 - Start, stop, backup, and update servers via Discord commands
-- Automatically restart previously running servers after reboot/shutdown (configurable with `autoRestartServersOnBoot`)
-- Windows service mode and console mode
-- Configuration validation and logging
-
-## Project Structure
-- `GameServerManagerService/` - Main service and bot implementation
-  - `Program.cs` - Service, Discord bot, and configuration logic
-  - `config.template.json` - Example configuration file (copy and edit as `config.json`)
-  - `install_service.bat` - Script to install the service
-- `.vscode/` - VS Code settings and tasks
-- `.gitignore` - Excludes sensitive and build files from source control
+- Automatically restart previously running servers after reboot/shutdown
 
 ## Getting Started
 
@@ -79,6 +69,53 @@ A Windows service and Discord bot for managing Steam-based game servers. This so
 - `!sm backup <server>` - Backup a server
 - `!sm update <server>` - Update a server (with pre-update backup)
 
+## Important Note: Game Save Locations & Service User
+
+Some game servers store saved games and configuration files in user-specific directories (such as `C:\Users\<username>\AppData` or similar). By default, this service runs as the **Local System** account, which means game saves and settings may be stored in a different location than when you start the server manually (e.g., from your own user account).
+
+**Implications:**
+- If you start a server manually, it may load/save data from your user profile.
+- If the service starts the server, it may load/save data from the Local System profile.
+- This can result in different save files, configs, or even missing saves depending on how the server was started.
+
+**Recommendation:**
+- For best results, configure the Windows service to run under **your own user account** (via the Windows Services management console). This ensures game servers use the same save/config location as when you start them manually, making the transition from manual management to this service seamless and avoiding issues with missing or duplicate saves.
+- Always check your game server documentation for details on where it stores data.
+
+## Configuration File (`config.json`)
+
+The main configuration file for the service and Discord bot is `GameServerManagerService/config.json`. You should create this file by copying `config.template.json` and editing it to match your environment.
+
+**Key fields:**
+- `DiscordBotToken`: *(string)* Your Discord bot token. Required for Discord integration.
+- `AutoRestartServersOnBoot`: *(bool)* If `true`, the service will attempt to restart any servers that were running before a reboot or shutdown.
+- `BackupLocation`: *(string)* Path where server backups will be stored.
+- `Servers`: *(array)* List of game server definitions. Each server entry includes:
+  - `Name`: *(string)* Friendly name for the server (used in Discord commands).
+  - `ExecutableName`: *(string)* Name of the server executable (e.g., `valheim_server.exe`).
+  - `StartCommand`: *(string)* Command to start the server.
+  - `UpdateCommand`: *(string, optional)* Command to update the server.
+  - `InstallLocation`: *(string, optional)* Directory where the server is installed.
+  - `SaveDirectory`: *(string, optional)* Directory containing the server's save files (for backup).
+
+**Example:**
+```json
+{
+  "DiscordBotToken": "YOUR_BOT_TOKEN_HERE",
+  "AutoRestartServersOnBoot": true,
+  "BackupLocation": "C:/GameBackups",
+  "Servers": [
+    {
+      "Name": "Valheim",
+      "ExecutableName": "valheim_server.exe",
+      "StartCommand": "start_valheim.bat",
+      "UpdateCommand": "update_valheim.bat",
+      "InstallLocation": "C:/Servers/Valheim",
+      "SaveDirectory": "C:/Servers/Valheim/saves"
+    }
+  ]
+}
+```
 
 ## License
 MIT License
