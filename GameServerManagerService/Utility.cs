@@ -21,6 +21,14 @@ public static class Utility
             error = new ArgumentException($"Start command not configured for server '{server.Name}'");
             return false;
         }
+        // Prevent duplicate server processes
+        var exeName = Path.GetFileNameWithoutExtension(server.ExecutableName);
+        var processes = System.Diagnostics.Process.GetProcessesByName(exeName);
+        if (processes.Length > 0)
+        {
+            error = new InvalidOperationException($"Server '{server.Name}' is already running.");
+            return false;
+        }
         try
         {
             var startInfo = new System.Diagnostics.ProcessStartInfo
