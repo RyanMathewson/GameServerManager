@@ -65,6 +65,18 @@ public class GameServerManagerWindowsService : ServiceBase
                 throw new InvalidOperationException("Configuration validation failed. See log for details.");
             }
             Logger.Log($"Service started. Loaded {Config.Servers.Count} servers.");
+
+            // Scan for currently running servers and mark them as started
+            foreach (var server in Config.Servers)
+            {
+                var exeName = Path.GetFileNameWithoutExtension(server.ExecutableName);
+                var processes = System.Diagnostics.Process.GetProcessesByName(exeName);
+                if (processes.Length > 0)
+                {
+                    MarkServerStarted(server.Name);
+                }
+            }
+
             if (Config.AutoRestartServersOnBoot)
             {
                 LoadStartedServers();
