@@ -222,7 +222,7 @@ public class DiscordBotService
         }
         try
         {
-            await message.Channel.SendMessageAsync($"Running update command for '{server.Name}'...");
+            var statusMsg = await message.Channel.SendMessageAsync($"Running update command for '{server.Name}'...");
             var updateInfo = new System.Diagnostics.ProcessStartInfo
             {
                 FileName = "cmd.exe",
@@ -236,14 +236,23 @@ public class DiscordBotService
             var updateProc = System.Diagnostics.Process.Start(updateInfo);
             if (updateProc != null)
             {
-                // Stream output to Discord in real-time
+                var outputBuffer = new List<string>();
+                var lastEdit = DateTime.UtcNow;
+                var editInterval = TimeSpan.FromSeconds(2);
                 var stdOutTask = Task.Run(async () =>
                 {
                     string? line;
                     while ((line = await updateProc.StandardOutput.ReadLineAsync()) != null)
                     {
                         if (!string.IsNullOrWhiteSpace(line))
-                            await message.Channel.SendMessageAsync($"> {line}");
+                        {
+                            outputBuffer.Add($"> {line}");
+                            if ((DateTime.UtcNow - lastEdit) > editInterval)
+                            {
+                                await statusMsg.ModifyAsync(m => m.Content = string.Join("\n", outputBuffer.TakeLast(15)));
+                                lastEdit = DateTime.UtcNow;
+                            }
+                        }
                     }
                 });
                 var stdErrTask = Task.Run(async () =>
@@ -252,11 +261,20 @@ public class DiscordBotService
                     while ((line = await updateProc.StandardError.ReadLineAsync()) != null)
                     {
                         if (!string.IsNullOrWhiteSpace(line))
-                            await message.Channel.SendMessageAsync($"> {line}");
+                        {
+                            outputBuffer.Add($"> {line}");
+                            if ((DateTime.UtcNow - lastEdit) > editInterval)
+                            {
+                                await statusMsg.ModifyAsync(m => m.Content = string.Join("\n", outputBuffer.TakeLast(15)));
+                                lastEdit = DateTime.UtcNow;
+                            }
+                        }
                     }
                 });
                 await updateProc.WaitForExitAsync();
                 await Task.WhenAll(stdOutTask, stdErrTask);
+                // Final update
+                await statusMsg.ModifyAsync(m => m.Content = string.Join("\n", outputBuffer.TakeLast(15)));
                 await message.Channel.SendMessageAsync($"Update command completed for '{server.Name}'.");
             }
             else
