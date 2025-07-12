@@ -185,43 +185,73 @@ public class DiscordBotService
             Logger.Log($"Error: {userMessage}");
     }
 
+    private static async Task AppendToStatusMessage(IUserMessage statusMessage, string newLine)
+    {
+        try
+        {
+            var currentContent = statusMessage.Content;
+            var newContent = currentContent + "\n" + newLine;
+            
+            // Discord message limit is 2000 characters
+            if (newContent.Length > 2000)
+            {
+                // Keep the first line (command info) and recent updates
+                var lines = newContent.Split('\n');
+                var firstLine = lines[0];
+                var recentLines = lines.TakeLast(Math.Min(lines.Length - 1, 15)).ToArray();
+                newContent = firstLine + "\n" + string.Join("\n", recentLines);
+                
+                // If still too long, truncate further
+                if (newContent.Length > 2000)
+                {
+                    newContent = newContent.Substring(0, 1997) + "...";
+                }
+            }
+            
+            await statusMessage.ModifyAsync(m => m.Content = newContent);
+        }
+        catch (Exception ex)
+        {
+            Logger.Error("Failed to update status message", ex);
+        }
+    }
+
     private static async Task HandleStopCommand(SocketMessage message, GameServerManagerConfiguration config, DiscordBotService bot, GameServerConfig server)
     {
-        await StopServer(server, message.Channel);
+        var statusMessage = await message.Channel.SendMessageAsync($"Processing stop command for '{server.Name}'...");
+        await StopServer(server, statusMessage);
     }
 
     private static async Task HandleStartCommand(SocketMessage message, GameServerManagerConfiguration config, DiscordBotService bot, GameServerConfig server)
     {
-        if (!Utility.StartServerProcess(server, out Exception? error))
-        {
-            await message.Channel.SendMessageAsync($"Failed to start '{server.Name}': {error?.Message}");
-            return;
-        }
-        await message.Channel.SendMessageAsync($"Start command executed for '{server.Name}'.");
+        var statusMessage = await message.Channel.SendMessageAsync($"Processing start command for '{server.Name}'...");
+        await StartServer(server, statusMessage);
     }
 
     private static async Task HandleBackupCommand(SocketMessage message, GameServerManagerConfiguration config, DiscordBotService bot, GameServerConfig server)
     {
-        var wasRunning = await StopServer(server, message.Channel);
-        bool backupSuccess = await BackupServer(server, config.BackupLocation, message.Channel);
+        var statusMessage = await message.Channel.SendMessageAsync($"Processing backup command for '{server.Name}'...");
+        var wasRunning = await StopServer(server, statusMessage, "before backup");
+        bool backupSuccess = await BackupServer(server, config.BackupLocation, statusMessage);
         if (wasRunning && backupSuccess)
         {
-            await StartServer(server, message.Channel);
+            await StartServer(server, statusMessage, "after backup");
         }
     }
 
     private static async Task HandleUpdateCommand(SocketMessage message, GameServerManagerConfiguration config, DiscordBotService bot, GameServerConfig server)
     {
-        var wasRunning = await StopServer(server, message.Channel);
-        bool backupSuccess = await BackupServer(server, config.BackupLocation, message.Channel, "before update");
+        var statusMessage = await message.Channel.SendMessageAsync($"Processing update command for '{server.Name}'...");
+        var wasRunning = await StopServer(server, statusMessage, "before update");
+        bool backupSuccess = await BackupServer(server, config.BackupLocation, statusMessage, "before update");
         if (!backupSuccess)
         {
-            await SendErrorAsync(message.Channel, $"Backup failed. Update aborted for '{server.Name}'.");
+            await AppendToStatusMessage(statusMessage, ":x: Backup failed. Update aborted.");
             return;
         }
         try
         {
-            var statusMsg = await message.Channel.SendMessageAsync($"Running update command for '{server.Name}'...");
+            await AppendToStatusMessage(statusMessage, $"Running update command for '{server.Name}'...");
             var updateInfo = new System.Diagnostics.ProcessStartInfo
             {
                 FileName = "cmd.exe",
@@ -248,7 +278,11 @@ public class DiscordBotService
                             outputBuffer.Add($"> {line}");
                             if ((DateTime.UtcNow - lastEdit) > editInterval)
                             {
-                                await statusMsg.ModifyAsync(m => m.Content = string.Join("\n", outputBuffer.TakeLast(15)));
+                                // For console output, we still replace to keep it manageable
+                                var consoleLines = outputBuffer.TakeLast(10);
+                                var currentContent = statusMessage.Content;
+                                var baseLines = currentContent.Split('\n').TakeWhile(l => !l.StartsWith(">")).ToArray();
+                                await statusMessage.ModifyAsync(m => m.Content = string.Join("\n", baseLines) + "\n" + string.Join("\n", consoleLines));
                                 lastEdit = DateTime.UtcNow;
                             }
                         }
@@ -264,7 +298,11 @@ public class DiscordBotService
                             outputBuffer.Add($"> {line}");
                             if ((DateTime.UtcNow - lastEdit) > editInterval)
                             {
-                                await statusMsg.ModifyAsync(m => m.Content = string.Join("\n", outputBuffer.TakeLast(15)));
+                                // For console output, we still replace to keep it manageable
+                                var consoleLines = outputBuffer.TakeLast(10);
+                                var currentContent = statusMessage.Content;
+                                var baseLines = currentContent.Split('\n').TakeWhile(l => !l.StartsWith(">")).ToArray();
+                                await statusMessage.ModifyAsync(m => m.Content = string.Join("\n", baseLines) + "\n" + string.Join("\n", consoleLines));
                                 lastEdit = DateTime.UtcNow;
                             }
                         }
@@ -272,74 +310,87 @@ public class DiscordBotService
                 });
                 await updateProc.WaitForExitAsync();
                 await Task.WhenAll(stdOutTask, stdErrTask);
-                // Final update
-                await statusMsg.ModifyAsync(m => m.Content = string.Join("\n", outputBuffer.TakeLast(15)));
-                await message.Channel.SendMessageAsync($"Update command completed for '{server.Name}'.");
+                // Final update for console output
+                var finalConsoleLines = outputBuffer.TakeLast(10);
+                var finalCurrentContent = statusMessage.Content;
+                var finalBaseLines = finalCurrentContent.Split('\n').TakeWhile(l => !l.StartsWith(">")).ToArray();
+                await statusMessage.ModifyAsync(m => m.Content = string.Join("\n", finalBaseLines) + "\n" + string.Join("\n", finalConsoleLines));
+                // Append completion message
+                await AppendToStatusMessage(statusMessage, $"Update command completed for '{server.Name}'.");
             }
             else
             {
-                await SendErrorAsync(message.Channel, $"Failed to start update process for '{server.Name}'.");
+                await AppendToStatusMessage(statusMessage, $":x: Failed to start update process for '{server.Name}'.");
+                return;
             }
         }
         catch (Exception ex)
         {
-            await SendErrorAsync(message.Channel, $"Failed to update server '{server.Name}'", ex);
+            await AppendToStatusMessage(statusMessage, $":x: Failed to update server '{server.Name}': {ex.Message}");
+            Logger.Error($"Failed to update server '{server.Name}'", ex);
             return;
         }
         if (wasRunning)
         {
-            await StartServer(server, message.Channel);
+            await StartServer(server, statusMessage, "after update");
         }
     }
 
-    private static async Task<bool> StopServer(GameServerConfig server, ISocketMessageChannel channel)
+    private static async Task<bool> StopServer(GameServerConfig server, IUserMessage statusMessage, string? context = null)
     {
         if (string.IsNullOrWhiteSpace(server.ExecutableName)) return false;
         var exeNameNoExt = Path.GetFileNameWithoutExtension(server.ExecutableName);
         var processes = System.Diagnostics.Process.GetProcessesByName(exeNameNoExt);
         if (processes.Length == 0) return false; // Not running
-        await channel.SendMessageAsync($"Stopping '{server.Name}' before backup...");
+        
+        var contextText = context != null ? $" {context}" : "";
+        await AppendToStatusMessage(statusMessage, $"Stopping '{server.Name}'{contextText}...");
+        
         int stopped = 0;
         foreach (var proc in processes)
         {
             try { proc.Kill(); stopped++; }
             catch (Exception ex)
             {
-                await SendErrorAsync(channel, $"Failed to stop process {proc.Id} for '{server.Name}'", ex);
+                await AppendToStatusMessage(statusMessage, $":x: Failed to stop process {proc.Id} for '{server.Name}': {ex.Message}");
+                Logger.Error($"Failed to stop process {proc.Id} for '{server.Name}'", ex);
                 throw; // Interrupt the operation
             }
         }
         GameServerManagerWindowsService.Instance.MarkServerStopped(server.Name);
-        await channel.SendMessageAsync($"Stopped {stopped} process(es) for '{server.Name}'.");
+        await AppendToStatusMessage(statusMessage, $"Stopped {stopped} process(es) for '{server.Name}'{contextText}.");
         return true;
     }
 
-    private static async Task StartServer(GameServerConfig server, ISocketMessageChannel channel)
+    private static async Task StartServer(GameServerConfig server, IUserMessage statusMessage, string? context = null)
     {
+        var contextText = context != null ? $" {context}" : "";
         if (!Utility.StartServerProcess(server, out Exception? error))
         {
-            await channel.SendMessageAsync($"Failed to start '{server.Name}': {error?.Message}");
+            await AppendToStatusMessage(statusMessage, $":x: Failed to start '{server.Name}'{contextText}: {error?.Message}");
             return;
         }
         GameServerManagerWindowsService.Instance.MarkServerStarted(server.Name);
-        await channel.SendMessageAsync($"Start command executed for '{server.Name}'.");
+        await AppendToStatusMessage(statusMessage, $"Start command executed for '{server.Name}'{contextText}.");
     }
 
-    private static async Task<bool> BackupServer(GameServerConfig server, string backupLocation, ISocketMessageChannel channel, string? context = null)
+    private static async Task<bool> BackupServer(GameServerConfig server, string backupLocation, IUserMessage statusMessage, string? context = null)
     {
         try
         {
             var timestamp = DateTime.Now.ToString("yyyyMMddHHmmss");
             var backupFileName = $"{server.Name}_backup_{timestamp}.zip";
             var backupFilePath = Path.Combine(backupLocation, backupFileName);
-            await channel.SendMessageAsync($"Performing backup for '{server.Name}'{(context != null ? " (" + context + ")" : "")}...");
+            var contextText = context != null ? $" ({context})" : "";
+            await AppendToStatusMessage(statusMessage, $"Performing backup for '{server.Name}'{contextText}...");
             System.IO.Compression.ZipFile.CreateFromDirectory(server.SaveDirectory, backupFilePath);
-            await channel.SendMessageAsync($"Backup of '{server.Name}' completed successfully. File: {backupFileName}");
+            await AppendToStatusMessage(statusMessage, $"Backup of '{server.Name}' completed successfully{contextText}. File: {backupFileName}");
             return true;
         }
         catch (Exception ex)
         {
-            await SendErrorAsync(channel, $"Failed to backup server '{server.Name}'", ex);
+            await AppendToStatusMessage(statusMessage, $":x: Failed to backup server '{server.Name}': {ex.Message}");
+            Logger.Error($"Failed to backup server '{server.Name}'", ex);
             return false;
         }
     }
